@@ -1,0 +1,7 @@
+[Unit]
+Description=Commit and push completed agent-wiki operations
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/agent-wiki/runtime.env
+ExecStart=%h/.local/lib/agent-wiki/agent-wiki-git-sync.sh

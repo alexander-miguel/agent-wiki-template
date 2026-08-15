@@ -1,0 +1,37 @@
+# Weekly digest of what changed in the vault, delivered to Telegram.
+#
+# This is the example job to copy when you want something delivered to your
+# phone. It shows the three things a delivered job needs that a file job does
+# not: a length budget, a compression policy, and a chat id that lives in
+# runtime.env rather than in this file.
+#
+# Set DIGEST_CHAT_ID in ~/.config/claude-jobs/runtime.env before enabling.
+# A dry run works without it.
+
+DESCRIPTION="Weekly vault digest"
+SCHEDULE="Sun *-*-* 18:00:00"
+
+WORKING_DIR="${AGENT_WIKI_REPO:-$HOME/agent-wiki}"
+MODEL="opus"
+EFFORT="medium"
+TOOLS="Read,Grep,Glob"
+DISALLOWED_TOOLS="Write,Edit,NotebookEdit,Agent,Task"
+ADD_DIR="${AGENT_WIKI_REPO:-$HOME/agent-wiki}"
+
+SYSTEM_PROMPT="You summarise a personal knowledge vault for its owner. You are concise, concrete, and you never invent activity that the files do not show."
+PROMPT_FILE="weekly-digest.md"
+VALIDATOR="weekly-digest.sh"
+
+# Telegram messages are capped at 4096 characters. Well under that keeps the
+# digest readable on a phone. Over the budget Claude edits its own answer
+# down; over the hard maximum the run fails instead of delivering a wall.
+MAX_CHARS="1200"
+OVERLONG_POLICY="compress"
+HARD_MAX_CHARS="1500"
+
+DELIVERY="telegram"
+DELIVERY_TARGET="${DIGEST_CHAT_ID:-}"
+DELIVERY_TOKEN_FILE="$HOME/.claude/channels/telegram/bot.token"
+KEEP_OUTPUTS="20"
+
+ENABLED="1"

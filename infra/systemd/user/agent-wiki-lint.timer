@@ -1,0 +1,11 @@
+[Unit]
+Description=Check agent-wiki structural invariants daily
+
+[Timer]
+OnBootSec=10min
+OnCalendar=daily
+Persistent=true
+Unit=agent-wiki-lint.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync completed agent-wiki operations every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=agent-wiki-git-sync.service
+
+[Install]
+WantedBy=timers.target

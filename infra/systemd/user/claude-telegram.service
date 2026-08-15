@@ -1,0 +1,28 @@
+[Unit]
+Description=Claude Code Telegram channel session
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+
+# Defaults first, so anything set in runtime.env overrides them.
+Environment=CLAUDE_TMUX_SESSION=claude-agent-wiki
+# systemd user services do not read your shell profile, so every directory
+# holding claude, bun or node must be listed here. install.sh rewrites this
+# line using the PATH of the shell you install from, which is why a version
+# manager such as nvm needs no special handling.
+Environment=PATH=%h/.local/bin:%h/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+EnvironmentFile=-%h/.config/agent-wiki/runtime.env
+ExecStart=%h/.local/lib/agent-wiki/claude-telegram-session.sh
+ExecStopPost=-/usr/bin/tmux kill-session -t ${CLAUDE_TMUX_SESSION}
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Watchdog for the agent-wiki Telegram session
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/agent-wiki/runtime.env
+ExecStart=%h/.local/lib/agent-wiki/claude-watchdog.sh

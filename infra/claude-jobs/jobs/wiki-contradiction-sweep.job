@@ -1,0 +1,29 @@
+# Nightly content sweep of the vault: contradictions, superseded claims, and
+# recurring concepts that have no page yet.
+#
+# Read-only by construction. Claude cannot write; the runner captures stdout
+# and writes the dated report itself. Nothing is ever auto-applied, because
+# deciding what to act on is the owner's job, not the agent's.
+#
+# This is the example job to copy when you want a read-only analysis that
+# lands in a file.
+
+DESCRIPTION="Nightly wiki contradiction sweep"
+SCHEDULE="*-*-* 03:32:00"
+
+WORKING_DIR="${AGENT_WIKI_REPO:-$HOME/agent-wiki}"
+MODEL="opus"
+EFFORT="high"
+TOOLS="Read,Grep,Glob"
+DISALLOWED_TOOLS="Bash,Write,Edit,NotebookEdit,WebSearch,WebFetch,Agent,Task"
+ADD_DIR="${AGENT_WIKI_REPO:-$HOME/agent-wiki}"
+
+SYSTEM_PROMPT="You are a careful wiki auditor. You have read-only access and must never attempt to modify any file. Report evidence you actually read; prefer saying nothing over inventing a finding."
+PROMPT_FILE="wiki-contradiction-sweep.md"
+VALIDATOR="wiki-contradiction-sweep.sh"
+
+DELIVERY="file"
+DELIVERY_TARGET="$HOME/.local/state/claude-jobs/wiki-contradiction-sweep/reports/{date}.md"
+KEEP_OUTPUTS="60"
+
+ENABLED="1"

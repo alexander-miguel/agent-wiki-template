@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the agent-wiki watchdog every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=claude-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh an old agent-wiki context when idle
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/agent-wiki/runtime.env
+ExecStart=%h/.local/lib/agent-wiki/claude-telegram-refresh.sh

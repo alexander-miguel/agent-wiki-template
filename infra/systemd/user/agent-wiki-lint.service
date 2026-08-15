@@ -1,0 +1,7 @@
+[Unit]
+Description=Check agent-wiki structural invariants
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/agent-wiki/runtime.env
+ExecStart=%h/.local/lib/agent-wiki/agent-wiki-lint.sh
