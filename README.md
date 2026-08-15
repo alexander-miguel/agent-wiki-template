@@ -168,7 +168,15 @@ trusting the prompt, and `GUARD_PATHS` fails a run that modified a file it
 was only supposed to read.
 
 The vault will accumulate personal detail quickly. Keep the GitHub repo
-private.
+private. This template is public; the vault you build with it should not be.
+
+One thing to decide consciously before you start it: the session runs with
+`--permission-mode auto`, which is what makes an unattended agent useful and
+also means it acts without asking. It is reachable from Telegram, so anyone
+who can message the bot can direct it. Set the DM policy to `pairing`,
+allowlist yourself, and do not run it as a user with more access than the job
+needs. If that trade is not one you want, change the mode in
+`infra/bin/claude-telegram-session.sh` before the first start.
 
 ## Layout
 
