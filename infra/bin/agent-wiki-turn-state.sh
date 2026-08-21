@@ -10,10 +10,15 @@ state_dir="${AGENT_WIKI_STATE_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agent-
 lock_file="$state_dir/operation.lock"
 busy_file="$state_dir/busy"
 last_activity_file="$state_dir/last-activity"
-mkdir -p "$state_dir"
+log_file="${AGENT_WIKI_TURN_STATE_LOG:-$HOME/.local/state/agent-wiki/turn-state.log}"
+mkdir -p "$state_dir" "$(dirname "$log_file")"
+log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$log_file"; }
 
 exec 9>"$lock_file"
-flock 9
+if ! flock -w 10 9; then
+    log "hook ${event:-unknown} timed out waiting for operation lock"
+    exit 0
+fi
 
 case "$event" in
     SessionStart)

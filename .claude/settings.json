@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-turn-state.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-session.py resume"
           }
         ]
       }
@@ -26,6 +30,10 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-turn-state.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-session.py journal"
           }
         ]
       }
@@ -36,6 +44,10 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-turn-state.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-session.py journal"
           }
         ]
       }
@@ -46,6 +58,10 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-turn-state.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/infra/bin/agent-wiki-session.py handover"
           }
         ]
       }

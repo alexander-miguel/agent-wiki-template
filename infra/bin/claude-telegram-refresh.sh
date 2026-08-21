@@ -7,6 +7,7 @@ log_file="${AGENT_WIKI_REFRESH_LOG:-$HOME/.local/state/agent-wiki/context-refres
 min_session_age="${CLAUDE_MIN_SESSION_AGE_SECONDS:-21600}"
 min_idle_age="${CLAUDE_MIN_IDLE_SECONDS:-900}"
 max_session_age="${CLAUDE_MAX_SESSION_AGE_SECONDS:-86400}"
+busy_max_age="${AGENT_WIKI_BUSY_MAX_AGE_SECONDS:-600}"
 lock_file="$state_dir/operation.lock"
 busy_file="$state_dir/busy"
 last_activity_file="$state_dir/last-activity"
@@ -26,15 +27,27 @@ fi
 session_age=$(( (now_usec - started_usec) / 1000000 ))
 [ "$session_age" -ge "$min_session_age" ] || exit 0
 
+# Maximum age is an escape hatch for both a stuck turn marker and a stuck
+# repository lock. It must be checked before attempting either one.
+if [ "$session_age" -ge "$max_session_age" ]; then
+    log "refreshing context at maximum age ${session_age}s"
+    systemctl --user restart claude-telegram.service
+    exit 0
+fi
+
 exec 9>"$lock_file"
 if ! flock -n 9; then
     log "refresh deferred: repository operation holds the lock"
     exit 0
 fi
 
-if [ -f "$busy_file" ] && [ "$session_age" -lt "$max_session_age" ]; then
-    log "refresh deferred: Claude turn is active (session age ${session_age}s)"
-    exit 0
+if [ -f "$busy_file" ]; then
+    busy_age=$(( $(date +%s) - $(stat -c %Y "$busy_file" 2>/dev/null || printf '0') ))
+    if [ "$busy_age" -ge 0 ] && [ "$busy_age" -lt "$busy_max_age" ]; then
+        log "refresh deferred: Claude turn is active (session age ${session_age}s)"
+        exit 0
+    fi
+    rm -f "$busy_file"
 fi
 
 if [ -f "$last_activity_file" ]; then
@@ -42,14 +55,10 @@ if [ -f "$last_activity_file" ]; then
 else
     idle_age="$session_age"
 fi
-if [ "$idle_age" -lt "$min_idle_age" ] && [ "$session_age" -lt "$max_session_age" ]; then
+if [ "$idle_age" -lt "$min_idle_age" ]; then
     log "refresh deferred: only ${idle_age}s idle"
     exit 0
 fi
 
-if [ "$session_age" -ge "$max_session_age" ]; then
-    log "refreshing context at maximum age ${session_age}s"
-else
-    log "refreshing idle context at age ${session_age}s after ${idle_age}s idle"
-fi
+log "refreshing idle context at age ${session_age}s after ${idle_age}s idle"
 systemctl --user restart claude-telegram.service

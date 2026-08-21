@@ -141,6 +141,8 @@ Chat is ephemeral unless written into the wiki. Persist selectively:
   before creating a durable record when intent is ambiguous.
 - After writing, say briefly what was retained and where. Never imply a fact
   will survive a restart unless it was actually written to the wiki.
+- When the start-of-session brief contains an unfinished commitment, either
+  complete it or record it in `wiki/log.md`; the brief is short-term memory only.
 
 ### Lint
 
@@ -234,11 +236,14 @@ as long as the work requires.
   `--channels plugin:telegram@claude-plugins-official`.
 - Runs on a Linux host inside a tmux session, supervised by the systemd user
   unit `claude-telegram.service`.
-- Every service start creates a fresh context. There is no `--continue`. Once
-  a context is six hours old, a timer refreshes it after at least 15 idle
-  minutes; a 24-hour maximum bounds indefinite deferral.
-- A five-minute watchdog checks the service, tmux, the plugin process, and the
-  Telegram API without sending Claude prompts.
+- Every service start creates a fresh context. There is no `--continue`.
+  Claude Code hooks inject a bounded brief from the newest prior handover or
+  completed-turn journal, so short-term continuity survives clean restarts and
+  hard kills without reviving a potentially broken session. Once a context is
+  six hours old, a timer refreshes it after at least 15 idle minutes; a 24-hour
+  maximum bounds indefinite deferral.
+- A one-minute watchdog checks the service, tmux, the descendant plugin process,
+  and Telegram delivery state without sending Claude prompts.
 - `agent-wiki-git-sync.timer` synchronises this repo every 15 minutes. Claude
   turn hooks and the sync job share an operation lock, so sync defers while a
   turn is active. Safe only while this host is the sole writer.

@@ -7,6 +7,7 @@ log_file="${AGENT_WIKI_GIT_LOG:-$HOME/.local/state/agent-wiki/git-sync.log}"
 state_dir="${AGENT_WIKI_STATE_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agent-wiki}"
 lock_file="$state_dir/operation.lock"
 busy_file="$state_dir/busy"
+busy_max_age="${AGENT_WIKI_BUSY_MAX_AGE_SECONDS:-600}"
 
 mkdir -p "$(dirname "$log_file")" "$state_dir"
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$log_file"; }
@@ -17,8 +18,12 @@ if ! flock -n 9; then
     exit 0
 fi
 if [ -f "$busy_file" ]; then
-    log "sync deferred: Claude turn is active"
-    exit 0
+    busy_age=$(( $(date +%s) - $(stat -c %Y "$busy_file" 2>/dev/null || printf '0') ))
+    if [ "$busy_age" -ge 0 ] && [ "$busy_age" -lt "$busy_max_age" ]; then
+        log "sync deferred: Claude turn is active"
+        exit 0
+    fi
+    rm -f "$busy_file"
 fi
 
 cd "$repo"

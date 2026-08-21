@@ -21,8 +21,11 @@ opens it, `grep` searches it, and you can walk away with it.
 - **A phone interface.** Telegram, with a reply discipline that acknowledges
   in one line and follows up when the work is done, so long tasks do not feel
   like a hang.
-- **Unattended operation.** Health checks every five minutes, restart on
-  repeated failure, context refresh when idle, commit and push every fifteen.
+- **Restart-safe conversation continuity.** Every Claude Code session is
+  fresh, but hooks inject a bounded brief from the last completed turns. The
+  Markdown wiki remains the canonical long-term memory.
+- **Unattended operation.** Health checks every minute, restart on repeated
+  failure, context refresh when idle, commit and push every fifteen minutes.
 - **A job scheduler.** Recurring Claude work as a spec file plus a prompt
   file, with locking, validation and delivery supplied for you.
 
@@ -60,7 +63,7 @@ Telegram  ──►  claude-telegram.service  ──►  tmux  ──►  claude
                         ▲                                  │
                         │                                  ▼
               claude-watchdog.timer                    wiki/*.md
-              (5 min liveness checks)                      │
+              (1 min liveness checks)                      │
                         │                                  ▼
               claude-telegram-refresh.timer         git-sync.timer
               (restart old idle contexts)           (lint, commit, push)
@@ -71,6 +74,12 @@ turn as active in `$XDG_RUNTIME_DIR`; git sync and context refresh take the
 same lock. So a commit never catches a half-written vault, and a refresh
 never kills the session mid-reply. Both failures, without it, look random and
 are miserable to debug.
+
+The same hooks maintain a mechanical per-turn journal. Clean exits freeze a
+handover; hard kills leave the journal behind. The next fresh session receives
+the newest one as bounded `SessionStart` context, without using `--continue`.
+This bridges short conversational gaps while keeping durable memory explicit
+and reviewable in `wiki/`.
 
 Full detail in `infra/README.md`.
 
@@ -188,7 +197,7 @@ wiki/ raw/ assets/     the vault
 infra/
   install.sh           idempotent installer
   wiki_lint.py         structural checks
-  bin/                 session, watchdog, refresh, sync, turn-state hooks
+  bin/                 launcher, continuity, watchdog, refresh, sync, hooks
   systemd/user/        one service and four timers
   claude-jobs/         scheduler for recurring Claude work
 .claude/settings.json  turn-state hooks

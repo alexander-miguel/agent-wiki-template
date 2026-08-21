@@ -3,7 +3,7 @@
 Everything that keeps the agent running on a Linux host, as version-controlled
 templates. No secrets live here. Host-specific values go in
 `~/.config/agent-wiki/runtime.env`, which the installer creates at mode 600
-and never overwrites.
+and preserves existing values.
 
 ## Install or update
 
@@ -35,34 +35,60 @@ sudo loginctl enable-linger "$USER"
 | Unit | Cadence | Job |
 |---|---|---|
 | `claude-telegram.service` | always on | Runs the Claude session inside tmux |
-| `claude-watchdog.timer` | 5 min | Four liveness checks, restarts on repeated failure |
+| `claude-watchdog.timer` | 1 min | Process-tree and Telegram delivery checks; guarded restart |
 | `claude-telegram-refresh.timer` | 15 min | Restarts an old context, but only when idle |
 | `agent-wiki-git-sync.timer` | 15 min | Pulls, lints, commits and pushes |
 | `agent-wiki-lint.timer` | daily | Structural check of the vault |
 
 ## The session
 
-`claude-telegram-session.sh` starts Claude inside a tmux session and then
-blocks until that session disappears, which is what lets systemd track a
-process it did not spawn directly. Attach with `tmux attach -t
-claude-agent-wiki` to watch it work; detach with `Ctrl-b d`.
+`claude-telegram-session.sh` removes Telegram Bun processes leaked by an
+older session, starts Claude inside tmux, and then blocks until that session
+disappears. That lets systemd track a process it did not spawn directly. Attach
+with `tmux attach -t claude-agent-wiki` to watch it work; detach with `Ctrl-b d`.
 
-Every service start creates a fresh context. There is no `--continue`.
+Every service start creates a fresh Claude Code context. There is no
+`--continue`. Short-term continuity comes from `agent-wiki-session.py` and the
+hooks in `.claude/settings.json`:
+
+- `Stop` and `StopFailure` mechanically rebuild a bounded journal from the
+  Claude transcript, with no model call.
+- `SessionEnd` freezes the journal as a handover. With
+  `AGENT_WIKI_SESSION_SUMMARY=1` (the installer default), a detached low-effort
+  Sonnet pass distils it into open threads and decisions.
+- `SessionStart` injects the newest prior handover or journal as additional
+  context. A hard kill therefore recovers through the last completed turn even
+  though no `SessionEnd` hook ran.
+
+Only this service exports `AGENT_WIKI_SESSION_CONTINUITY=1`. Terminal Claude
+sessions, subagents, and scheduled jobs do not write or inherit the brief. The
+brief is bounded short-term context, not durable memory: anything that must
+survive belongs in the wiki.
 
 ## The watchdog
 
-Every five minutes `claude-watchdog.sh` checks, in order:
+Every minute `claude-watchdog.sh` checks, in order:
 
 1. the systemd service is active,
 2. the tmux session exists,
 3. the Claude process is alive and not a zombie,
-4. the Telegram plugin process is a child of it,
-5. `getMe` against the Telegram Bot API returns `ok`.
+4. Telegram Bun processes exist anywhere in Claude's descendant tree,
+5. `getMe` against the Telegram Bot API returns `ok`,
+6. `getWebhookInfo` reports zero pending updates.
+
+The descendant walk matters because current Claude Code can place the plugin
+below daemon and PTY-host processes rather than as a direct child. Exact Bun
+argv/cwd checks also identify and reap old launcher and `server.ts` processes
+outside the live Claude tree; two pollers on one token otherwise race for
+updates.
 
 A single failure is recorded, not acted on, because a transient API blip is
 not an outage. Two consecutive failures trigger a restart, and an inactive
-service triggers one immediately. A 30-minute cooldown stops a restart loop.
-If `TELEGRAM_ALERT_CHAT_ID` is set, a failed restart sends you a message.
+service triggers one immediately. Repeat restarts inside an hour back off for
+5, 10, 20, then 30 minutes. A healthy hour resets the backoff. Except when the
+service is inactive, a fresh busy marker defers restart for up to ten minutes,
+so the watchdog does not kill an active reply. If `TELEGRAM_ALERT_CHAT_ID` is
+set, recovery alerts are sent without consuming Claude allowance.
 
 ## Context refresh
 
@@ -73,22 +99,25 @@ restarts the session, but only when all of these hold:
 - no Claude turn is currently running,
 - the agent has been idle at least 15 minutes (`CLAUDE_MIN_IDLE_SECONDS`).
 
-A 24-hour maximum (`CLAUDE_MAX_SESSION_AGE_SECONDS`) bounds the case where a
-busy marker gets stuck or the agent genuinely never goes idle.
+Busy markers older than ten minutes are stale. A 24-hour maximum
+(`CLAUDE_MAX_SESSION_AGE_SECONDS`) is checked before the operation lock, so a
+wedged repository task cannot defer refresh forever.
 
 ## Turn locking
 
 This is the part that makes the whole thing safe, and the part people skip.
 
 Claude Code hooks in `.claude/settings.json` call
-`agent-wiki-turn-state.sh` on session start, prompt submit, stop, stop
-failure, and session end. It maintains a `busy` marker and an advisory
-`flock` under `$XDG_RUNTIME_DIR/agent-wiki/`.
+`agent-wiki-turn-state.sh` on session start, prompt submit, stop, stop failure,
+and session end. It maintains a `busy` marker and an advisory `flock` under
+`$XDG_RUNTIME_DIR/agent-wiki/`. Hook lock acquisition times out after ten
+seconds and logs the timeout rather than hanging Claude indefinitely.
 
-Git sync and context refresh take the same lock. So a commit never runs
-against a half-written vault, and a refresh never kills the session in the
-middle of a reply. Without this you get corrupted files and lost turns, and
-both failures look random.
+Git sync and context refresh take the same lock. So a commit never runs against
+a half-written vault, and an ordinary refresh or watchdog recovery never kills
+the session in the middle of a reply. All readers discard a busy marker older
+than ten minutes. Without these bounds, one hung hook can block maintenance
+forever.
 
 ## Git sync
 
@@ -131,5 +160,7 @@ systemctl --user list-timers --all
 journalctl --user -u claude-watchdog.service -n 50 --no-pager
 tail ~/.local/state/agent-wiki/git-sync.log
 tail ~/.local/state/agent-wiki/context-refresh.log
+tail ~/.local/state/agent-wiki/sessions/sessions.log
+tail ~/.local/state/agent-wiki/turn-state.log
 python3 infra/wiki_lint.py
 ```

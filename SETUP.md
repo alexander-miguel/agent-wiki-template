@@ -170,6 +170,13 @@ the service dies on start with a confusing error. If you installed Node in a
 way that only your interactive shell knows about, run the installer from that
 same shell.
 
+The installer also deploys Claude Code session-continuity hooks. Each service
+start still uses a fresh context, but the newest bounded handover or completed-
+turn journal is injected at `SessionStart`. This survives hard kills without
+using `--continue`. `AGENT_WIKI_SESSION_SUMMARY=1` enables the default detached
+Sonnet handover summary; set it to `0` in `runtime.env` to keep mechanical
+journals only.
+
 Now fill in `~/.config/agent-wiki/runtime.env`:
 
 ```bash
@@ -191,8 +198,10 @@ tmux ls                                                 # claude-agent-wiki exis
 systemctl --user list-timers --all                      # four timers scheduled
 ```
 
-Then message the bot from Telegram and confirm it answers. This is the real
-test; the first three only prove a process exists.
+Then message the bot from Telegram and confirm it answers. Restart the
+service once, send a follow-up, and confirm the new session can use the prior
+turn's brief. These are the real tests; process status alone proves neither
+Telegram delivery nor conversation continuity.
 
 ## Phase 6 — Git sync
 
@@ -284,8 +293,8 @@ Tell the user:
 | Service starts then dies in seconds | systemd `PATH` misses `claude` or `node` | Re-run `./infra/install.sh` from a shell where `claude --version` works |
 | Everything stops when the user logs out | Lingering not enabled | `sudo loginctl enable-linger "$USER"` |
 | Bot silent, service active | Plugin process died inside tmux | `tmux attach -t claude-agent-wiki` and read the pane |
-| Watchdog restart loop | Failing health check plus cooldown | `tail ~/.local/state/agent-wiki/watchdog/watchdog.log` |
-| Git sync always defers | Stale busy marker from a crashed turn | `rm "$XDG_RUNTIME_DIR"/agent-wiki/busy` |
+| Watchdog restart loop | Repeated health failure despite escalating backoff | `tail ~/.local/state/agent-wiki/watchdog/watchdog.log` |
+| Git sync always defers | Hook or repository operation is stuck | Wait ten minutes for stale-marker cleanup; inspect `turn-state.log` and the lock holder |
 | Sync log says lint failed | Vault broke its own schema | `python3 infra/wiki_lint.py` and fix what it names |
 | Job fails instantly | Token file not mode 600, or a required var unset | `chmod 600` the token; check `REQUIRED_ENV` in the spec |
 | Context never refreshes | Session never idle for 15 minutes | Expected; the 24-hour maximum will force it |
@@ -297,7 +306,7 @@ systemctl --user list-timers --all
 # agent-wiki-git-sync.timer        every 15 min
 # agent-wiki-lint.timer            daily
 # claude-telegram-refresh.timer    every 15 min
-# claude-watchdog.timer            every 5 min
+# claude-watchdog.timer            every 1 min
 
 systemctl --user is-active claude-telegram.service   # active
 python3 ~/agent-wiki/infra/wiki_lint.py              # errors=0

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install or update the agent-wiki user services on this host.
 #
-# Idempotent: safe to re-run after every git pull. It never overwrites
-# runtime.env, which is where your host-specific values live.
+# Idempotent: safe to re-run after every git pull. It preserves existing
+# runtime.env values and only appends newly required defaults.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -22,8 +22,12 @@ python3 -c 'import yaml' >/dev/null 2>&1 || {
     exit 1
 }
 
-install -d -m 755 "$lib_dir" "$unit_dir" "$config_dir" "$HOME/.local/state/agent-wiki"
-for script in "$repo"/infra/bin/*.sh; do
+install -d -m 755 "$lib_dir" "$unit_dir" "$config_dir" \
+    "$HOME/.local/state/agent-wiki" \
+    "$HOME/.local/state/agent-wiki/sessions/journal" \
+    "$HOME/.local/state/agent-wiki/sessions/handover"
+for script in "$repo"/infra/bin/*.sh "$repo"/infra/bin/*.py; do
+    [ -e "$script" ] || continue
     install -m 755 "$script" "$lib_dir/$(basename "$script")"
 done
 for unit in "$repo"/infra/systemd/user/*; do
@@ -67,9 +71,15 @@ if [ ! -f "$runtime_env" ]; then
         printf 'CLAUDE_MIN_SESSION_AGE_SECONDS=21600\n'
         printf 'CLAUDE_MIN_IDLE_SECONDS=900\n'
         printf 'CLAUDE_MAX_SESSION_AGE_SECONDS=86400\n'
+        printf '\n# Write a deterministic turn journal and summarise clean handovers.\n'
+        printf 'AGENT_WIKI_SESSION_SUMMARY=1\n'
     } >"$runtime_env"
     chmod 600 "$runtime_env"
     printf 'Created %s. Review it before relying on the services.\n' "$runtime_env"
+else
+    if ! grep -q '^AGENT_WIKI_SESSION_SUMMARY=' "$runtime_env"; then
+        printf 'AGENT_WIKI_SESSION_SUMMARY=1\n' >>"$runtime_env"
+    fi
 fi
 
 systemctl --user daemon-reload

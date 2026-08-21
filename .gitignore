@@ -7,3 +7,4 @@
 # Never commit host-specific values or credentials
 runtime.env
 *.token
+**/__pycache__/
